@@ -1,7 +1,7 @@
 {
   "name": "meta-tools",
-  "version": "1.0.0",
-  "description": "Claude Code plugin: meta-tooling workflow — context-break evaluation, CLAUDE.md chunking, MCP command generation, primitive selection, and claude-code feedback filing, with context-management/mcp-integration/feedback-filing/primitive-selection variants.",
+  "version": "1.1.0",
+  "description": "Claude Code plugin: meta-tooling workflow — context-break evaluation, CLAUDE.md chunking, MCP command generation, and primitive selection. Feedback-filing skills have moved to the Claude-Code-Feedback plugin.",
   "author": {
     "name": "Daniel Rosehill",
     "url": "https://github.com/danielrosehill"
@@ -13,7 +13,6 @@
     "meta",
     "context-management",
     "mcp",
-    "feedback",
     "primitives",
     "decision-support"
   ]

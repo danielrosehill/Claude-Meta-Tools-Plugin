@@ -15,7 +15,7 @@ Before asking anything, read these files (relative to the plugin root):
 2. `reference/decision-rules.md` — the decision tree you apply
 3. `reference/docs-snapshot.md` — key excerpts from the official Anthropic docs
 
-Then check for persistent user context at `~/.claude/what-thing-context.md`. If it exists, read it — it contains the user's development patterns (solo vs team, public vs private, MCP comfort level, etc.) and should shape your recommendation. If it doesn't exist, proceed without it but mention at the end that `/what-thing:set-context` can tailor future recommendations.
+Then check for persistent user context at `<plugin-data-dir>/context.md` — where `<plugin-data-dir>` resolves as `$CLAUDE_USER_DATA/meta-tools/` if `CLAUDE_USER_DATA` is set; otherwise `$XDG_DATA_HOME/claude-plugins/meta-tools/` if `XDG_DATA_HOME` is set; otherwise `~/.local/share/claude-plugins/meta-tools/`. See the canonical convention in the `meta-tools:plugin-data-storage` skill. If it exists, read it — it contains the user's development patterns (solo vs team, public vs private, MCP comfort level, etc.) and should shape your recommendation. If it doesn't exist, proceed without it but mention at the end that `/what-thing:set-context` can tailor future recommendations.
 
 ## Step 2 — Understand the goal
 

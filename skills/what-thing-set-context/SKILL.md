@@ -1,15 +1,26 @@
 ---
 name: what-thing-set-context
-description: Capture the user's Claude Code development patterns (solo vs team, public vs private distribution, MCP comfort, default install scope) into ~/.claude/what-thing-context.md so future recommendations from /what-thing:pick are tailored. Use when the user asks to set, update, review, or clear their what-thing context.
+description: Capture the user's Claude Code development patterns (solo vs team, public vs private distribution, MCP comfort, default install scope) into the meta-tools plugin data directory so future recommendations from /what-thing:pick are tailored. Use when the user asks to set, update, review, or clear their what-thing context.
 ---
 
 # Set persistent context for What Thing
 
-Your job is to interview the user briefly and write a short markdown file to `~/.claude/what-thing-context.md`. The `/what-thing:pick` skill reads this file before making recommendations, so the facts you capture here directly shape future advice.
+Your job is to interview the user briefly and write a short markdown file to `<plugin-data-dir>/context.md`. The `/what-thing:pick` skill reads this file before making recommendations, so the facts you capture here directly shape future advice.
+
+## Migration from legacy path (one-time)
+
+Before resolving the data directory, check for legacy data at these paths:
+- `<plugin-data-dir>/context.md`
+
+If a legacy file exists AND `<plugin-data-dir>/context.md` does NOT exist, move it to the new location and delete the legacy file. Tell the user: "Migrated what-thing-context.md from ~/.claude/ to <new>."
+
+## Path resolution
+
+Resolve the plugin's data directory as `$CLAUDE_USER_DATA/meta-tools/` if `CLAUDE_USER_DATA` is set; otherwise `$XDG_DATA_HOME/claude-plugins/meta-tools/` if `XDG_DATA_HOME` is set; otherwise `~/.local/share/claude-plugins/meta-tools/`. Create the directory if it doesn't exist. See the canonical convention in the `meta-tools:plugin-data-storage` skill.
 
 ## Step 1 — Check existing context
 
-Read `~/.claude/what-thing-context.md` if it exists. If it does, show the user the current values and ask whether they want to update specific fields or rewrite from scratch.
+Read `<plugin-data-dir>/context.md` if it exists. If it does, show the user the current values and ask whether they want to update specific fields or rewrite from scratch.
 
 If it does not exist, proceed to a fresh interview.
 
@@ -27,7 +38,7 @@ Do not pad with extra questions. Five is the cap.
 
 ## Step 3 — Write the file
 
-Write `~/.claude/what-thing-context.md` with this structure. Keep each field to one or two sentences — this file should stay short enough to fully load into context.
+Write `<plugin-data-dir>/context.md` with this structure. Keep each field to one or two sentences — this file should stay short enough to fully load into context.
 
 ```markdown
 # What Thing — user context
@@ -54,7 +65,7 @@ Fill in today's date (use the `currentDate` the harness already gave you if avai
 
 ## Step 4 — Confirm
 
-Show the user the final file contents and confirm it's saved at `~/.claude/what-thing-context.md`. Mention that they can edit it by hand any time.
+Show the user the final file contents and confirm it's saved at `<plugin-data-dir>/context.md`. Mention that they can edit it by hand any time.
 
 ## Style
 

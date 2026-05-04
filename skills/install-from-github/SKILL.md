@@ -5,7 +5,18 @@ description: Use when the user points at a GitHub repo (an agent skill, MCP serv
 
 The user has found something on GitHub — a skill, an MCP server, a "Claude plugin" — and wants it integrated into their Claude Code setup **without leaving loose, untracked artefacts on disk**. The goal of this skill is to be a router: figure out what the project actually is, and pick the cleanest install path so the result is reproducible across machines.
 
-Guiding principle: **everything the user installs should be reachable through a marketplace they control**, so a fresh machine can be reconstituted by re-adding marketplaces and re-installing plugins. Loose skills dropped into `~/.claude/skills/` or one-off MCP entries scattered across configs are the failure mode this skill exists to prevent.
+Guiding principle: **everything the user installs should be reachable through a server-controlled surface** (the Skill-Substrate, when available; otherwise a marketplace they control), so a fresh machine can be reconstituted by reconnecting to the substrate or re-adding marketplaces. Loose skills dropped into `~/.claude/skills/` or one-off MCP entries scattered across configs are the failure mode this skill exists to prevent.
+
+## Routing precedence (highest to lowest)
+
+When a repo classifies as `claude-plugin` or `claude-marketplace`:
+
+1. **Skill-Substrate** — if the user runs the substrate (i.e. has the `Skill-Substrate-Admin` plugin installed and the substrate is reachable), register the repo as a marketplace there. Subscriptions are server-side, so the install is reproducible across all the user's hosts without per-host bookkeeping. This is the default for Daniel.
+2. **User's primary marketplace** — if the upstream is the user's own work and a primary marketplace exists.
+3. **User's third-party marketplace** — for upstream by others, fork-and-wrap.
+4. **Direct GitHub install** — last resort, only for one-off testing.
+
+Detect substrate availability by checking for `~/.claude/plugins/Skill-Substrate-Admin/` or by attempting `ssh ubuntuvm "docker ps --filter name=skill-substrate --format '{{.Names}}'"` (returns non-empty on substrate hosts). Skip the substrate path silently if neither indicator is present.
 
 ## Step 0: Onboarding — third-party marketplace pointer
 
@@ -85,33 +96,65 @@ Show the user the classification and the proposed action, then act on confirmati
 
 Best case — it's already structured for native install.
 
-1. Check whether it's already listed in any marketplace the user has added:
-   ```bash
-   claude plugins marketplace list
+1. Check whether the repo is already known to any of the user's surfaces:
+   - **Substrate** (if available): `ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 skills marketplace list"` — match on `source_repo`.
+   - **Local marketplaces**: `claude plugins marketplace list`, then for each, check its `marketplace.json` for an entry whose `source.repo` matches.
+
+2. **If found on the substrate** as marketplace `M`, the install command is:
    ```
-   For each listed marketplace, check its `marketplace.json` for an entry whose `source.repo` matches the input repo.
-2. If found in a marketplace `M`, the install command is:
+   ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 \
+     skills install <M>:<plugin-name>"
+   ```
+   (Or call the `Skill-Substrate-Admin:admin-subscribe` skill.) Subscription is server-side; no further action needed.
+
+3. **If found in a local marketplace** `M` (legacy / external host), the install command is:
    ```bash
    claude plugins install <plugin-name>@<M>
    ```
-   Show the command. **Do not auto-install at user scope** (mirrors the convention in `new-claude-plugin`). Mention `--scope project` for ad-hoc use.
-3. If not in any marketplace, offer two paths:
-   - **Direct install from GitHub** (one-off, not tracked in any marketplace):
+   Show the command. **Do not auto-install at user scope.** Mention `--scope project` for ad-hoc use.
+
+4. **If not found anywhere**, offer routes in precedence order:
+   - **Substrate route (preferred when substrate is reachable)** — register the repo as a one-plugin marketplace on the substrate, then ingest and subscribe:
+     ```
+     ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 \
+       skills marketplace add <owner>-<repo> --repo https://github.com/<owner>/<repo>.git \
+         --visibility private --authorship third_party"
+     ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 \
+       skills marketplace ingest <owner>-<repo>"
+     ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 \
+       skills install <owner>-<repo>:<plugin-name>"
+     ```
+     Use `--authorship third_party` for upstream-by-others (engages the trust gate for review-on-update). Use `--authorship user` only if the upstream is also Daniel's. Prefer calling the `Skill-Substrate-Admin:admin-marketplace-add` and `admin-marketplace-ingest` and `admin-subscribe` skills directly when available.
+   - **Third-party marketplace route (substrate not reachable, or multi-host portability without substrate)** — jump to Step 4 with the existing `plugin.json` as the source of truth.
+   - **Direct install from GitHub** (one-off, not tracked anywhere):
      ```bash
      claude plugins install <owner>/<repo>
      ```
      Warn that this is the loose-install case the skill is meant to avoid. Only suggest if the user is testing.
-   - **Register in the third-party marketplace** (preferred for keepers): jump to Step 4 with the existing `plugin.json` as the source of truth.
 
 ### 3b. `claude-marketplace`
 
 The repo is itself a marketplace.
 
-1. Add it as a marketplace:
-   ```bash
-   claude plugins marketplace add <owner>/<repo>
-   ```
-2. List its plugins and ask the user which one(s) to install. Same scoping caveat as 3a — show the command, don't auto-install at user scope.
+**Substrate route (preferred when available):**
+
+```
+ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 \
+  skills marketplace add <owner>-<repo> --repo https://github.com/<owner>/<repo>.git \
+    --visibility private --authorship third_party"
+ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 \
+  skills marketplace ingest <owner>-<repo>"
+```
+
+Then `skills marketplace show <owner>-<repo>` to list its plugins, and `skills install <owner>-<repo>:<plugin-name>` for the ones the user wants. Prefer the corresponding admin skills when available.
+
+**Local-marketplace route (fallback for non-substrate hosts):**
+
+```bash
+claude plugins marketplace add <owner>/<repo>
+```
+
+List its plugins and ask the user which one(s) to install. Same scoping caveat as 3a — show the command, don't auto-install at user scope.
 
 ### 3c. `mcp-server`
 
@@ -187,9 +230,11 @@ claude plugins marketplace update <owner>
 Show the user:
 
 1. What the input repo was classified as.
-2. What action was taken (install command shown / marketplace entry added / MCP add-command emitted).
-3. The exact `claude plugins install <plugin-name>@<marketplace>` command they can run if/when they want it active. **Don't run it for them** unless they explicitly ask — same convention as `new-claude-plugin`.
-4. For wrapped third-party skills, the upstream tracking metadata (fork remote `upstream`, or `.upstream` file path) so a future update flow can pull changes.
+2. Which routing path was chosen (substrate / primary marketplace / third-party marketplace / direct GitHub install) and why.
+3. What action was taken (substrate marketplace registered + ingested + subscribed / install command shown / marketplace entry added / MCP add-command emitted).
+4. For substrate routes: the substrate marketplace name, ingest report record count, and any `rejected[]` entries.
+5. For local-marketplace routes: the exact `claude plugins install <plugin-name>@<marketplace>` command they can run if/when they want it active. **Don't run it for them** unless they explicitly ask.
+6. For wrapped third-party skills, the upstream tracking metadata (fork remote `upstream`, or `.upstream` file path) so a future update flow can pull changes.
 
 ## Notes on upstream tracking
 

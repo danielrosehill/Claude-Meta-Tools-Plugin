@@ -16,7 +16,7 @@ When a repo classifies as `claude-plugin` or `claude-marketplace`:
 3. **User's third-party marketplace** — for upstream by others, fork-and-wrap.
 4. **Direct GitHub install** — last resort, only for one-off testing.
 
-Detect substrate availability by checking for `~/.claude/plugins/Skill-Substrate-Admin/` or by attempting `ssh ubuntuvm "docker ps --filter name=skill-substrate --format '{{.Names}}'"` (returns non-empty on substrate hosts). Skip the substrate path silently if neither indicator is present.
+Detect substrate availability by checking for `~/.claude/plugins/Skill-Substrate-Admin/` or by attempting `ssh residencehome "docker ps --filter name=skill-substrate --format '{{.Names}}'"` (returns non-empty on substrate hosts). Skip the substrate path silently if neither indicator is present.
 
 ## Step 0: Onboarding — third-party marketplace pointer
 
@@ -97,12 +97,12 @@ Show the user the classification and the proposed action, then act on confirmati
 Best case — it's already structured for native install.
 
 1. Check whether the repo is already known to any of the user's surfaces:
-   - **Substrate** (if available): `ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 skills marketplace list"` — match on `source_repo`.
+   - **Substrate** (if available): `ssh residencehome "docker exec skill-substrate-skills-ingester-1 skills marketplace list"` — match on `source_repo`.
    - **Local marketplaces**: `claude plugins marketplace list`, then for each, check its `marketplace.json` for an entry whose `source.repo` matches.
 
 2. **If found on the substrate** as marketplace `M`, the install command is:
    ```
-   ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 \
+   ssh residencehome "docker exec skill-substrate-skills-ingester-1 \
      skills install <M>:<plugin-name>"
    ```
    (Or call the `Skill-Substrate-Admin:admin-subscribe` skill.) Subscription is server-side; no further action needed.
@@ -116,12 +116,12 @@ Best case — it's already structured for native install.
 4. **If not found anywhere**, offer routes in precedence order:
    - **Substrate route (preferred when substrate is reachable)** — register the repo as a one-plugin marketplace on the substrate, then ingest and subscribe:
      ```
-     ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 \
+     ssh residencehome "docker exec skill-substrate-skills-ingester-1 \
        skills marketplace add <owner>-<repo> --repo https://github.com/<owner>/<repo>.git \
          --visibility private --authorship third_party"
-     ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 \
+     ssh residencehome "docker exec skill-substrate-skills-ingester-1 \
        skills marketplace ingest <owner>-<repo>"
-     ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 \
+     ssh residencehome "docker exec skill-substrate-skills-ingester-1 \
        skills install <owner>-<repo>:<plugin-name>"
      ```
      Use `--authorship third_party` for upstream-by-others (engages the trust gate for review-on-update). Use `--authorship user` only if the upstream is also Daniel's. Prefer calling the `Skill-Substrate-Admin:admin-marketplace-add` and `admin-marketplace-ingest` and `admin-subscribe` skills directly when available.
@@ -139,10 +139,10 @@ The repo is itself a marketplace.
 **Substrate route (preferred when available):**
 
 ```
-ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 \
+ssh residencehome "docker exec skill-substrate-skills-ingester-1 \
   skills marketplace add <owner>-<repo> --repo https://github.com/<owner>/<repo>.git \
     --visibility private --authorship third_party"
-ssh ubuntuvm "docker exec skill-substrate-skills-ingester-1 \
+ssh residencehome "docker exec skill-substrate-skills-ingester-1 \
   skills marketplace ingest <owner>-<repo>"
 ```
 
